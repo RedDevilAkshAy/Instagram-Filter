@@ -1,44 +1,63 @@
 (() => {
-    if (!window.location.hostname.includes('facebook.com')) return;
+    const hostname = window.location.hostname;
+    let platform = null;
+    let postSelector = '';
 
-    console.log("🔍 Facebook Post Counter Filter Loaded");
+    if (hostname.includes('instagram.com')) {
+        platform = 'instagram';
+        postSelector = 'article';
+    } else if (hostname.includes('facebook.com')) {
+        platform = 'facebook';
+        postSelector = 'div[role="article"]';
+    }
 
+    if (!platform) return;
+
+    // ================== FEED DETECTION ==================
     function isMainFeed() {
         const url = window.location.href;
-        return url === 'https://www.facebook.com/' || 
-               url.endsWith('facebook.com') ||
-               url.includes('/home') || url.includes('sk=h_');
+
+        if (platform === 'instagram') {
+            return url === 'https://www.instagram.com/' || 
+                   url === 'https://www.instagram.com' ||
+                   (url.includes('instagram.com') && !url.includes('/p/') && 
+                    !url.includes('/reel/') && !url.includes('/stories/'));
+        }
+
+        if (platform === 'facebook') {
+            return url === 'https://www.facebook.com/' || 
+                   url.endsWith('facebook.com') ||
+                   url.includes('/home') || url.includes('sk=h_');
+        }
+        return false;
     }
 
     if (!isMainFeed()) {
-        console.log("Not on main feed");
+        console.log(`✅ ${platform.toUpperCase()} - Not on main feed, skipping filter`);
         return;
     }
 
-    let postCounter = 0;
+    console.log(`🚀 ${platform.toUpperCase()} Feed Filter Active`);
+
+    let postCount = 0;
     const MAX_POSTS = 5;
 
-    console.log(`🚀 Facebook Feed Counter Active (max ${MAX_POSTS} posts)`);
+    function countPosts() {
+        const posts = document.querySelectorAll(postSelector);
+        const currentCount = posts.length;
 
-    function countAndLimit() {
-        // Get all potential posts
-        const articles = document.querySelectorAll('div[role="article"]');
-        const messages = document.querySelectorAll('div[data-ad-preview="message"]');
+        if (currentCount > postCount) {
+            postCount = currentCount;
+            console.log(`📈 ${platform} Posts detected: ${postCount}`);
 
-        const totalDetected = Math.max(articles.length, messages.length);
-
-        if (totalDetected > postCounter) {
-            postCounter = totalDetected;
-            console.log(`📈 Post counter updated: ${postCounter}`);
-
-            if (postCounter >= MAX_POSTS && !document.getElementById('work-overlay')) {
-                console.log("🎯 5+ posts reached → Showing overlay");
-                createOverlay();
+            if (postCount >= MAX_POSTS && !document.getElementById('work-overlay')) {
+                console.log("🎯 Limit reached → Showing overlay");
+                showOverlay();
             }
         }
     }
 
-    function createOverlay() {
+    function showOverlay() {
         if (document.getElementById('work-overlay')) return;
 
         const overlay = document.createElement('div');
@@ -51,9 +70,9 @@
         `;
 
         overlay.innerHTML = `
-            <div style="text-align: center; max-width: 520px; padding: 40px;">
+            <div style="text-align:center; max-width: 520px; padding: 40px;">
                 <h1 style="font-size: 3.2rem; margin-bottom: 1rem;">⏰ Get back to work!</h1>
-                <p style="font-size: 1.5rem;">You've reached your post limit for now.</p>
+                <p style="font-size: 1.5rem;">You've seen enough posts for now.</p>
                 <button id="dismiss-overlay" style="
                     margin-top: 2rem; padding: 16px 48px; font-size: 1.2rem;
                     background: #1877f2; color: white; border: none; 
@@ -67,23 +86,21 @@
 
         document.getElementById('dismiss-overlay').addEventListener('click', () => {
             overlay.remove();
-            postCounter = 3; // Reset a bit so it doesn't immediately trigger again
+            postCount = 3; // soft reset
         });
     }
 
-    // Run counter frequently
-    setTimeout(countAndLimit, 1200);
-    setTimeout(countAndLimit, 3000);
+    // Initial checks
+    setTimeout(countPosts, 1000);
+    setTimeout(countPosts, 2500);
 
+    // Mutation Observer
     const observer = new MutationObserver(() => {
-        requestAnimationFrame(countAndLimit);
+        requestAnimationFrame(countPosts);
     });
 
-    observer.observe(document.body, { 
-        childList: true, 
-        subtree: true 
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    // Backup timer
-    setInterval(countAndLimit, 2500);
+    // Backup
+    setInterval(countPosts, 3000);
 })();
