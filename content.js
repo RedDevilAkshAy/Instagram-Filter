@@ -1,43 +1,55 @@
 (() => {
     if (!window.location.hostname.includes('facebook.com')) return;
 
-    console.log("🔍 Facebook Aggressive Filter Loaded");
+    console.log("🔍 Facebook Broad Filter Loaded");
 
     function isMainFeed() {
-        const url = window.location.href.toLowerCase();
-        return url.endsWith('facebook.com/') || 
+        const url = window.location.href;
+        return url === 'https://www.facebook.com/' || 
+               url.endsWith('facebook.com') ||
                url.includes('/home') ||
                url.includes('sk=h_');
     }
 
     if (!isMainFeed()) {
-        console.log("Not on main feed");
+        console.log("Not main feed");
         return;
     }
 
-    console.log("🚀 Main Feed Detected - Aggressive Mode");
+    console.log("🚀 Main Feed - Broad Filter Active");
+
+    // Very broad selectors for current Facebook
+    const broadSelectors = [
+        'div[role="article"]',
+        'div.x1yztbdb',           // Common container class
+        'div[data-ad-preview="message"]',
+        'div[style*="order:"]',   // Feed items often have order style
+    ];
 
     function limitFeed() {
-        // Try multiple strategies
-        const articles = document.querySelectorAll('div[role="article"]');
-        console.log(`Found ${articles.length} articles`);
-
         let count = 0;
-        articles.forEach(article => {
-            // Find a good parent to hide
-            let target = article;
+        let hidden = 0;
 
-            // Go up a few levels to find a bigger container
-            for (let i = 0; i < 4; i++) {
-                if (target.parentElement) target = target.parentElement;
-            }
+        broadSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            console.log(`Selector "${selector}" → ${elements.length} elements`);
 
-            count++;
-            if (count > 5) {
-                target.style.setProperty("display", "none", "important");
-                console.log(`Hidden container #${count}`);
-            }
+            elements.forEach(el => {
+                // Skip very small elements
+                if (el.offsetHeight < 200) return;
+
+                count++;
+
+                if (count > 5) {
+                    const parent = el.parentElement || el;
+                    parent.style.setProperty("display", "none", "important");
+                    hidden++;
+                    console.log(`Hidden element #${count}`);
+                }
+            });
         });
+
+        console.log(`Total processed: ${count} | Hidden: ${hidden}`);
 
         if (count >= 5 && !document.getElementById('work-overlay')) {
             createOverlay();
@@ -53,15 +65,15 @@
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(255,255,255,0.97); z-index: 2147483647;
             display: flex; align-items: center; justify-content: center;
-            font-family: system-ui; color: #111;
+            font-family: system-ui;
         `;
 
         overlay.innerHTML = `
-            <div style="text-align: center; max-width: 500px;">
-                <h1 style="font-size: 42px; margin-bottom: 16px;">⏰ Get back to work!</h1>
-                <p style="font-size: 22px; margin-bottom: 30px;">You've seen enough posts for now.</p>
-                <button id="dismiss" style="padding: 16px 40px; font-size: 18px; background: #1877f2; color: white; border: none; border-radius: 10px; cursor: pointer;">
-                    Continue for 5 minutes
+            <div style="text-align:center; padding: 40px;">
+                <h1 style="font-size: 3.2rem; margin-bottom: 20px;">⏰ Get back to work!</h1>
+                <p style="font-size: 1.5rem;">Enough scrolling for now.</p>
+                <button id="dismiss" style="margin-top:30px; padding:16px 40px; font-size:1.2rem; background:#1877f2; color:white; border:none; border-radius:8px; cursor:pointer;">
+                    5 more minutes
                 </button>
             </div>
         `;
@@ -70,13 +82,11 @@
         document.getElementById('dismiss').onclick = () => overlay.remove();
     }
 
-    // Run multiple times
-    setTimeout(limitFeed, 1000);
-    setTimeout(limitFeed, 2500);
-    setTimeout(limitFeed, 4500);
+    // Multiple runs
+    [800, 2200, 4200].forEach(delay => setTimeout(limitFeed, delay));
 
     const observer = new MutationObserver(() => requestAnimationFrame(limitFeed));
     observer.observe(document.body, { childList: true, subtree: true });
 
-    setInterval(limitFeed, 4000);
+    setInterval(limitFeed, 3500);
 })();
