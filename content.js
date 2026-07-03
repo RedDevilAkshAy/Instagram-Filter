@@ -2,24 +2,52 @@
     let platform = 'unknown';
     let postSelectors = [];
 
-    // Platform detection
-    if (window.location.hostname.includes('instagram.com')) {
+    const hostname = window.location.hostname;
+
+    if (hostname.includes('instagram.com')) {
         platform = 'instagram';
         postSelectors = ['article'];
-    } else if (window.location.hostname.includes('facebook.com')) {
+    } else if (hostname.includes('facebook.com')) {
         platform = 'facebook';
-        // Multiple fallback selectors for Facebook (very dynamic DOM)
         postSelectors = [
             'div[role="article"]',
             'div[data-testid="feed_story"]',
-            '[data-pagelet*="FeedUnit"]',
-            'div[aria-posinset]'
+            '[data-pagelet*="FeedUnit"]'
         ];
     }
 
     if (platform === 'unknown') return;
 
-    console.log(`🚫 ${platform.toUpperCase()} Content Filter loaded`);
+    // ================== FEED DETECTION ==================
+    function isMainFeed() {
+        const url = window.location.href;
+
+        if (platform === 'instagram') {
+            // Main feed: instagram.com or instagram.com/?variant=...
+            return url === 'https://www.instagram.com/' || 
+                   url === 'https://www.instagram.com' ||
+                   url.includes('/?') && !url.includes('/p/') && 
+                   !url.includes('/reel/') && !url.includes('/stories/');
+        } 
+
+        if (platform === 'facebook') {
+            // Main feed detection
+            return url === 'https://www.facebook.com/' || 
+                   url === 'https://www.facebook.com' ||
+                   url.includes('/home') ||
+                   url.includes('?sk=h_chr') ||   // chronological
+                   url.includes('?sk=h_nor');     // top stories
+        }
+
+        return false;
+    }
+
+    if (!isMainFeed()) {
+        console.log(`✅ ${platform.toUpperCase()} Filter skipped (not on main feed)`);
+        return;
+    }
+
+    console.log(`🚫 ${platform.toUpperCase()} Feed Filter activated`);
 
     function createOverlay() {
         if (document.getElementById('work-overlay')) return;
@@ -63,7 +91,7 @@
 
         document.getElementById('dismiss-overlay').addEventListener('click', () => {
             overlay.remove();
-            setTimeout(() => limitFeed(), 300000); // 5 minutes
+            setTimeout(() => limitFeed(), 300000);
         });
     }
 
@@ -82,7 +110,6 @@
         let visibleCount = 0;
 
         posts.forEach((post) => {
-            // Skip already hidden or tiny elements
             if (post.style.display === 'none' || post.offsetHeight < 100) return;
 
             visibleCount++;
@@ -92,17 +119,13 @@
             }
         });
 
-        // Show overlay after ~5 posts
         if (visibleCount >= 5 && !document.getElementById('work-overlay')) {
             setTimeout(() => {
                 const currentVisible = getAllPosts().filter(p => 
-                    p.offsetHeight > 100 && 
-                    p.style.display !== 'none'
+                    p.offsetHeight > 100 && p.style.display !== 'none'
                 ).length;
 
-                if (currentVisible >= 4) {
-                    createOverlay();
-                }
+                if (currentVisible >= 4) createOverlay();
             }, 1200);
         }
     }
@@ -110,17 +133,13 @@
     // Initial run
     limitFeed();
 
-    // MutationObserver for infinite scroll
+    // Observer
     const observer = new MutationObserver(() => {
         requestAnimationFrame(limitFeed);
     });
 
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    // Extra safety net
+    // Backup interval
     setInterval(limitFeed, 2500);
-
 })();
