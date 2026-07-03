@@ -1,57 +1,45 @@
 (() => {
-    const hostname = window.location.hostname;
-    if (!hostname.includes('facebook.com')) return;
+    if (!window.location.hostname.includes('facebook.com')) return;
 
-    console.log("🔍 Facebook Feed Filter v2 Loaded");
+    console.log("🔍 Facebook Aggressive Filter Loaded");
 
     function isMainFeed() {
-        const url = window.location.href;
-        return url === 'https://www.facebook.com/' || 
-               url === 'https://www.facebook.com' ||
+        const url = window.location.href.toLowerCase();
+        return url.endsWith('facebook.com/') || 
                url.includes('/home') ||
-               url.includes('sk=h_chr') || 
-               url.includes('sk=h_nor');
+               url.includes('sk=h_');
     }
 
     if (!isMainFeed()) {
-        console.log("✅ Not on main feed → skipping");
+        console.log("Not on main feed");
         return;
     }
 
-    console.log("🚀 Main Facebook Feed Detected");
-
-    const postSelectors = ['div[role="article"]'];   // Best one for now
-
-    function getAllPosts() {
-        return Array.from(document.querySelectorAll(postSelectors[0]));
-    }
+    console.log("🚀 Main Feed Detected - Aggressive Mode");
 
     function limitFeed() {
-        const posts = getAllPosts();
-        let visibleCount = 0;
+        // Try multiple strategies
+        const articles = document.querySelectorAll('div[role="article"]');
+        console.log(`Found ${articles.length} articles`);
 
-        posts.forEach(post => {
-            // Skip if already hidden or very small
-            if (post.style.display === 'none') return;
+        let count = 0;
+        articles.forEach(article => {
+            // Find a good parent to hide
+            let target = article;
 
-            // Better visibility check
-            const height = post.offsetHeight;
-            if (height < 150) return;   // Skip headers, ads, etc.
+            // Go up a few levels to find a bigger container
+            for (let i = 0; i < 4; i++) {
+                if (target.parentElement) target = target.parentElement;
+            }
 
-            visibleCount++;
-
-            if (visibleCount > 5) {
-                post.style.setProperty("display", "none", "important");
-                console.log(`✅ Hidden post #${visibleCount}`);
-            } else {
-                console.log(`Post ${visibleCount} kept (height: ${height})`);
+            count++;
+            if (count > 5) {
+                target.style.setProperty("display", "none", "important");
+                console.log(`Hidden container #${count}`);
             }
         });
 
-        console.log(`📊 Visible posts: ${visibleCount}`);
-
-        if (visibleCount >= 5 && !document.getElementById('work-overlay')) {
-            console.log("🛑 Showing Get back to work overlay");
+        if (count >= 5 && !document.getElementById('work-overlay')) {
             createOverlay();
         }
     }
@@ -63,44 +51,32 @@
         overlay.id = 'work-overlay';
         overlay.style.cssText = `
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255, 255, 255, 0.97);
+            background: rgba(255,255,255,0.97); z-index: 2147483647;
             display: flex; align-items: center; justify-content: center;
-            z-index: 2147483647; font-family: system-ui;
-            color: #1c1e21;
+            font-family: system-ui; color: #111;
         `;
 
         overlay.innerHTML = `
-            <div style="text-align:center;">
-                <h1 style="font-size: 3rem; margin-bottom: 1rem;">⏰ Get back to work!</h1>
-                <p style="font-size: 1.4rem; max-width: 480px; margin: 0 auto 2rem;">
-                    You've seen enough posts for now.
-                </p>
-                <button id="dismiss-overlay" style="
-                    padding: 14px 40px; font-size: 1.1rem; 
-                    background: #1877f2; color: white; border: none; 
-                    border-radius: 8px; cursor: pointer; font-weight: 600;">
+            <div style="text-align: center; max-width: 500px;">
+                <h1 style="font-size: 42px; margin-bottom: 16px;">⏰ Get back to work!</h1>
+                <p style="font-size: 22px; margin-bottom: 30px;">You've seen enough posts for now.</p>
+                <button id="dismiss" style="padding: 16px 40px; font-size: 18px; background: #1877f2; color: white; border: none; border-radius: 10px; cursor: pointer;">
                     Continue for 5 minutes
                 </button>
             </div>
         `;
 
         document.body.appendChild(overlay);
-
-        document.getElementById('dismiss-overlay').onclick = () => {
-            overlay.remove();
-        };
+        document.getElementById('dismiss').onclick = () => overlay.remove();
     }
 
-    // Initial runs with delay
-    setTimeout(limitFeed, 1200);
-    setTimeout(limitFeed, 3000);
+    // Run multiple times
+    setTimeout(limitFeed, 1000);
+    setTimeout(limitFeed, 2500);
+    setTimeout(limitFeed, 4500);
 
-    // Observer
-    const observer = new MutationObserver(() => {
-        requestAnimationFrame(limitFeed);
-    });
+    const observer = new MutationObserver(() => requestAnimationFrame(limitFeed));
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Periodic check
-    setInterval(limitFeed, 3000);
+    setInterval(limitFeed, 4000);
 })();
