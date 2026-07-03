@@ -1,12 +1,12 @@
 (() => {
     if (!window.location.hostname.includes('facebook.com')) return;
 
-    console.log("🔍 Facebook Feed Container Filter Loaded");
+    console.log("🔍 Facebook Post Counter Filter Loaded");
 
     function isMainFeed() {
         const url = window.location.href;
         return url === 'https://www.facebook.com/' || 
-               url.endsWith('/facebook.com') ||
+               url.endsWith('facebook.com') ||
                url.includes('/home') || url.includes('sk=h_');
     }
 
@@ -15,39 +15,26 @@
         return;
     }
 
-    console.log("🚀 Targeting main feed container");
+    let postCounter = 0;
+    const MAX_POSTS = 5;
 
-    function limitFeed() {
-        // Find the main feed
-        const feed = document.querySelector('div[role="feed"]') || 
-                     document.querySelector('[aria-label="News Feed"]') || 
-                     document.querySelector('div[data-pagelet="Feed"]');
+    console.log(`🚀 Facebook Feed Counter Active (max ${MAX_POSTS} posts)`);
 
-        if (!feed) {
-            console.log("Feed container not found yet...");
-            return;
-        }
+    function countAndLimit() {
+        // Get all potential posts
+        const articles = document.querySelectorAll('div[role="article"]');
+        const messages = document.querySelectorAll('div[data-ad-preview="message"]');
 
-        console.log("✅ Feed container found!");
+        const totalDetected = Math.max(articles.length, messages.length);
 
-        const children = Array.from(feed.children);
-        let postCount = 0;
+        if (totalDetected > postCounter) {
+            postCounter = totalDetected;
+            console.log(`📈 Post counter updated: ${postCounter}`);
 
-        children.forEach(child => {
-            if (child.offsetHeight < 150) return; // Skip small elements
-
-            postCount++;
-
-            if (postCount > 5) {
-                child.style.setProperty("display", "none", "important");
-                console.log(`Hidden child #${postCount}`);
-            } else {
-                console.log(`Kept child #${postCount}`);
+            if (postCounter >= MAX_POSTS && !document.getElementById('work-overlay')) {
+                console.log("🎯 5+ posts reached → Showing overlay");
+                createOverlay();
             }
-        });
-
-        if (postCount >= 5 && !document.getElementById('work-overlay')) {
-            createOverlay();
         }
     }
 
@@ -58,31 +45,45 @@
         overlay.id = 'work-overlay';
         overlay.style.cssText = `
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.97); z-index: 2147483647;
+            background: rgba(255, 255, 255, 0.97);
             display: flex; align-items: center; justify-content: center;
+            z-index: 2147483647; font-family: system-ui; color: #1c1e21;
         `;
 
         overlay.innerHTML = `
-            <div style="text-align:center">
-                <h1 style="font-size: 3rem;">⏰ Get back to work!</h1>
-                <p style="font-size: 1.5rem; margin: 20px 0;">You've seen enough.</p>
-                <button id="dismiss" style="padding: 15px 40px; font-size: 1.2rem; background: #1877f2; color: white; border: none; border-radius: 8px;">
-                    5 more minutes
+            <div style="text-align: center; max-width: 520px; padding: 40px;">
+                <h1 style="font-size: 3.2rem; margin-bottom: 1rem;">⏰ Get back to work!</h1>
+                <p style="font-size: 1.5rem;">You've reached your post limit for now.</p>
+                <button id="dismiss-overlay" style="
+                    margin-top: 2rem; padding: 16px 48px; font-size: 1.2rem;
+                    background: #1877f2; color: white; border: none; 
+                    border-radius: 10px; cursor: pointer; font-weight: 600;">
+                    Continue for 5 more minutes
                 </button>
             </div>
         `;
 
         document.body.appendChild(overlay);
-        document.getElementById('dismiss').onclick = () => overlay.remove();
+
+        document.getElementById('dismiss-overlay').addEventListener('click', () => {
+            overlay.remove();
+            postCounter = 3; // Reset a bit so it doesn't immediately trigger again
+        });
     }
 
-    // Run with delays
-    setTimeout(limitFeed, 1500);
-    setTimeout(limitFeed, 3500);
-    setTimeout(limitFeed, 6000);
+    // Run counter frequently
+    setTimeout(countAndLimit, 1200);
+    setTimeout(countAndLimit, 3000);
 
-    const observer = new MutationObserver(() => requestAnimationFrame(limitFeed));
-    observer.observe(document.body, { childList: true, subtree: true });
+    const observer = new MutationObserver(() => {
+        requestAnimationFrame(countAndLimit);
+    });
 
-    setInterval(limitFeed, 4000);
+    observer.observe(document.body, { 
+        childList: true, 
+        subtree: true 
+    });
+
+    // Backup timer
+    setInterval(countAndLimit, 2500);
 })();
