@@ -1,14 +1,20 @@
 (() => {
     let platform = 'unknown';
-    let postSelector = '';
+    let postSelectors = [];
 
-    // Detect platform
+    // Platform detection
     if (window.location.hostname.includes('instagram.com')) {
         platform = 'instagram';
-        postSelector = 'article';           // Reliable for IG posts
+        postSelectors = ['article'];
     } else if (window.location.hostname.includes('facebook.com')) {
         platform = 'facebook';
-        postSelector = 'div[role="article"], div[data-testid="feed_story"]';
+        // Multiple fallback selectors for Facebook (very dynamic DOM)
+        postSelectors = [
+            'div[role="article"]',
+            'div[data-testid="feed_story"]',
+            '[data-pagelet*="FeedUnit"]',
+            'div[aria-posinset]'
+        ];
     }
 
     if (platform === 'unknown') return;
@@ -23,54 +29,61 @@
         overlay.style.cssText = `
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.92);
+            background: rgba(255, 255, 255, 0.98);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 2147483647;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: white;
+            color: #1c1e21;
             text-align: center;
         `;
 
         overlay.innerHTML = `
             <div>
                 <h1 style="font-size: 3rem; margin-bottom: 1rem;">⏰ Get back to work!</h1>
-                <p style="font-size: 1.4rem; opacity: 0.9;">You've seen enough posts for now.</p>
+                <p style="font-size: 1.4rem; opacity: 0.9; max-width: 500px;">
+                    You've seen enough posts for now.
+                </p>
                 <button id="dismiss-overlay" style="
                     margin-top: 2rem;
-                    padding: 12px 32px;
+                    padding: 14px 36px;
                     font-size: 1.1rem;
-                    background: #0095f6;
+                    background: #1877f2;
                     color: white;
                     border: none;
                     border-radius: 8px;
                     cursor: pointer;
+                    font-weight: 600;
                 ">Continue for 5 more minutes</button>
             </div>
         `;
 
         document.body.appendChild(overlay);
 
-        // Allow temporary override
         document.getElementById('dismiss-overlay').addEventListener('click', () => {
             overlay.remove();
-            setTimeout(() => {
-                if (!document.getElementById('work-overlay')) {
-                    limitFeed(); // Re-apply filter after delay
-                }
-            }, 300000); // 5 minutes
+            setTimeout(() => limitFeed(), 300000); // 5 minutes
         });
     }
 
-    function limitFeed() {
-        const posts = document.querySelectorAll(postSelector);
+    function getAllPosts() {
+        let allPosts = [];
+        postSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(el => {
+                if (!allPosts.includes(el)) allPosts.push(el);
+            });
+        });
+        return allPosts;
+    }
 
+    function limitFeed() {
+        const posts = getAllPosts();
         let visibleCount = 0;
 
         posts.forEach((post) => {
-            // Skip already hidden or very small elements
-            if (post.style.display === 'none' || post.offsetHeight < 50) return;
+            // Skip already hidden or tiny elements
+            if (post.style.display === 'none' || post.offsetHeight < 100) return;
 
             visibleCount++;
 
@@ -79,21 +92,25 @@
             }
         });
 
-        // Show overlay after 4-5 visible posts
+        // Show overlay after ~5 posts
         if (visibleCount >= 5 && !document.getElementById('work-overlay')) {
-            // Small delay so user sees the 5th post briefly
             setTimeout(() => {
-                if (document.querySelectorAll(postSelector + ':not([style*="display: none"])').length >= 4) {
+                const currentVisible = getAllPosts().filter(p => 
+                    p.offsetHeight > 100 && 
+                    p.style.display !== 'none'
+                ).length;
+
+                if (currentVisible >= 4) {
                     createOverlay();
                 }
-            }, 800);
+            }, 1200);
         }
     }
 
     // Initial run
     limitFeed();
 
-    // Watch for new posts (infinite scroll)
+    // MutationObserver for infinite scroll
     const observer = new MutationObserver(() => {
         requestAnimationFrame(limitFeed);
     });
@@ -103,6 +120,7 @@
         subtree: true
     });
 
-    // Also run periodically in case of heavy dynamic updates
-    setInterval(limitFeed, 2000);
+    // Extra safety net
+    setInterval(limitFeed, 2500);
+
 })();
