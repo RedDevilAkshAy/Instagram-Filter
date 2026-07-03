@@ -1,57 +1,52 @@
 (() => {
     if (!window.location.hostname.includes('facebook.com')) return;
 
-    console.log("🔍 Facebook Broad Filter Loaded");
+    console.log("🔍 Facebook Feed Container Filter Loaded");
 
     function isMainFeed() {
         const url = window.location.href;
         return url === 'https://www.facebook.com/' || 
-               url.endsWith('facebook.com') ||
-               url.includes('/home') ||
-               url.includes('sk=h_');
+               url.endsWith('/facebook.com') ||
+               url.includes('/home') || url.includes('sk=h_');
     }
 
     if (!isMainFeed()) {
-        console.log("Not main feed");
+        console.log("Not on main feed");
         return;
     }
 
-    console.log("🚀 Main Feed - Broad Filter Active");
-
-    // Very broad selectors for current Facebook
-    const broadSelectors = [
-        'div[role="article"]',
-        'div.x1yztbdb',           // Common container class
-        'div[data-ad-preview="message"]',
-        'div[style*="order:"]',   // Feed items often have order style
-    ];
+    console.log("🚀 Targeting main feed container");
 
     function limitFeed() {
-        let count = 0;
-        let hidden = 0;
+        // Find the main feed
+        const feed = document.querySelector('div[role="feed"]') || 
+                     document.querySelector('[aria-label="News Feed"]') || 
+                     document.querySelector('div[data-pagelet="Feed"]');
 
-        broadSelectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            console.log(`Selector "${selector}" → ${elements.length} elements`);
+        if (!feed) {
+            console.log("Feed container not found yet...");
+            return;
+        }
 
-            elements.forEach(el => {
-                // Skip very small elements
-                if (el.offsetHeight < 200) return;
+        console.log("✅ Feed container found!");
 
-                count++;
+        const children = Array.from(feed.children);
+        let postCount = 0;
 
-                if (count > 5) {
-                    const parent = el.parentElement || el;
-                    parent.style.setProperty("display", "none", "important");
-                    hidden++;
-                    console.log(`Hidden element #${count}`);
-                }
-            });
+        children.forEach(child => {
+            if (child.offsetHeight < 150) return; // Skip small elements
+
+            postCount++;
+
+            if (postCount > 5) {
+                child.style.setProperty("display", "none", "important");
+                console.log(`Hidden child #${postCount}`);
+            } else {
+                console.log(`Kept child #${postCount}`);
+            }
         });
 
-        console.log(`Total processed: ${count} | Hidden: ${hidden}`);
-
-        if (count >= 5 && !document.getElementById('work-overlay')) {
+        if (postCount >= 5 && !document.getElementById('work-overlay')) {
             createOverlay();
         }
     }
@@ -65,14 +60,13 @@
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(255,255,255,0.97); z-index: 2147483647;
             display: flex; align-items: center; justify-content: center;
-            font-family: system-ui;
         `;
 
         overlay.innerHTML = `
-            <div style="text-align:center; padding: 40px;">
-                <h1 style="font-size: 3.2rem; margin-bottom: 20px;">⏰ Get back to work!</h1>
-                <p style="font-size: 1.5rem;">Enough scrolling for now.</p>
-                <button id="dismiss" style="margin-top:30px; padding:16px 40px; font-size:1.2rem; background:#1877f2; color:white; border:none; border-radius:8px; cursor:pointer;">
+            <div style="text-align:center">
+                <h1 style="font-size: 3rem;">⏰ Get back to work!</h1>
+                <p style="font-size: 1.5rem; margin: 20px 0;">You've seen enough.</p>
+                <button id="dismiss" style="padding: 15px 40px; font-size: 1.2rem; background: #1877f2; color: white; border: none; border-radius: 8px;">
                     5 more minutes
                 </button>
             </div>
@@ -82,11 +76,13 @@
         document.getElementById('dismiss').onclick = () => overlay.remove();
     }
 
-    // Multiple runs
-    [800, 2200, 4200].forEach(delay => setTimeout(limitFeed, delay));
+    // Run with delays
+    setTimeout(limitFeed, 1500);
+    setTimeout(limitFeed, 3500);
+    setTimeout(limitFeed, 6000);
 
     const observer = new MutationObserver(() => requestAnimationFrame(limitFeed));
     observer.observe(document.body, { childList: true, subtree: true });
 
-    setInterval(limitFeed, 3500);
+    setInterval(limitFeed, 4000);
 })();
